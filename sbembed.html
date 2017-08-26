@@ -1,0 +1,7 @@
+<html>
+<body>
+
+<div id='slate_b2e50' style='width:666px;height:458px;'></div><script>(function(w) { var a = 0, _deps = [{t: 'Slatebox', u: 'https://s3.amazonaws.com/slatebox/1.0.0/slatebox.min.js'}], ck = function() { if (a === 1) { window.onload = function(e) { var _slate = new Slatebox().slate({ container: 'slate_b2e50', viewPort:{allowDrag:false},showBirdsEye:false,showZoom:false,showMultiSelect:false,showUndoRedo:false }); _slate.init(); Slatebox.getJSON('http://localhost:3000/api/slates/?id=b2e50&callback=?', function(_json) { _json[0].options.showLocks=false; _slate.loadJSON(JSON.stringify(_json[0]));_slate.resize(666 - 20, 0, 5); _slate.disable(); }); } } }; for(dx in _deps) { d = _deps[dx]; if (!w[d.t]) { var sc = document.createElement('script'); sc.src = d.u; sc.async = true; sc.onload = sc.onreadystatechange = function () { var state = sc.readyState; if (!state || /loaded|complete/.test(state)) { a++; ck(); } }; document.head.appendChild(sc); } else { a++; ck(); } }; })(window);</script>
+
+</body>
+</html>

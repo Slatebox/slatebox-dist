@@ -1,0 +1,277 @@
+"use strict";
+
+var _underscore = require("underscore");
+
+var _underscore2 = _interopRequireDefault(_underscore);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+(function ($s, $slate, $) {
+    $slate.fn._collab = function () {
+        var _self = this,
+            options,
+            _invoker,
+            pc;
+
+        _self.init = function () {
+            pc = _self._.options.collaboration || {};
+            if (!$s.localRecipients) $s.localRecipients = [];
+            wire();
+        };
+
+        _self.invoke = function (pkg) {
+            _invoker[pkg.type](pkg);
+        };
+
+        function process(pkg) {
+            if ($s.localRecipients.length > 1) {
+                var _time = 0;
+                for (var s in $s.localRecipients) {
+                    _time += 10;
+                    (function (rec, t) {
+                        setTimeout(function () {
+                            rec["_"]["collab"]["invoke"](pkg);
+                        }, t);
+                    })($s.localRecipients[s], _time);
+                }
+            } else if (_invoker[pkg.type]) {
+                _self._.undoRedo && _self._.undoRedo.hide();
+                _invoker[pkg.type](pkg);
+            } else {
+                pc.onCollaboration && pc.onCollaboration({ type: "custom", slate: _self._, pkg: pkg });
+            }
+        };
+
+        function wire() {
+
+            _invoker = {
+
+                onZoom: function onZoom(pkg) {
+                    var zoomPercent = _self._.options.viewPort.originalWidth / pkg.data.zoomLevel * 100;
+                    _self._.canvas.zoom({
+                        dur: pkg.data.duration || 500,
+                        zoomPercent: zoomPercent,
+                        callbacks: {
+                            during: function during(percentComplete, easing) {
+                                //additional calcs
+                            },
+                            after: function after(zoomVal) {
+                                addMessage(pkg, 'That was me\n zooming the canvas!');
+                            }
+                        }
+                    });
+                },
+
+                onNodePositioned: function onNodePositioned(pkg) {
+                    var cn = _self._.nodes.one(pkg.data.id);
+                    cn.position(pkg.data.location, function () {}, pkg.data.easing, pkg.data.duration || 500);
+                    addMessage(pkg, 'That was me\n positioning the node!');
+                },
+
+                onNodeLinkRemoved: function onNodeLinkRemoved(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.links && cn.links.unset();
+                    addMessage(pkg, 'That was me\n removing the link!');
+                },
+
+                onNodeLinkAdded: function onNodeLinkAdded(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.links && cn.links.set(pkg.data.linkType, pkg.data.linkData);
+                    addMessage(pkg, 'That was me\n adding the resource link!');
+                },
+
+                onNodeUnlocked: function onNodeUnlocked(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.options.allowDrag = true;
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n unlocking the node!');
+                },
+
+                onNodeLocked: function onNodeLocked(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.options.allowDrag = false;
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n locking the node!');
+                },
+
+                onNodeToBack: function onNodeToBack(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.vect.toBack();
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n send to back!');
+                },
+
+                onNodeToFront: function onNodeToFront(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.vect.toFront();
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n bringing to front!');
+                },
+
+                onNodeShapeChanged: function onNodeShapeChanged(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.shapes.set(pkg.data);
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n changing the shape!');
+                },
+
+                onNodeAdded: function onNodeAdded(pkg) {
+                    var blnPreserve = pkg.preserve !== undefined ? pkg.preserve : true;
+                    _self._.loadJSON(pkg.data, blnPreserve, true);
+                    //_self._.birdseye && _self._.birdseye.refresh();
+                    addMessage(pkg, 'That was me\n adding the node!');
+                },
+
+                onNodeImageChanged: function onNodeImageChanged(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.images.set(pkg.data.img, pkg.data.w, pkg.data.w);
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n changing the image!');
+                },
+
+                onNodeDeleted: function onNodeDeleted(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.del();
+                    _self._.birdseye && _self._.birdseye.nodeDeleted(pkg);
+                    addMessage(pkg, 'That was me\n deleting the node!');
+                },
+
+                onNodeResized: function onNodeResized(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.hideOwnMenus();
+                    _underscore2.default.extend(cn.options, pkg.data);
+                    cn.resize.set(pkg.data.width, pkg.data.height, 500);
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n changing the size!');
+                },
+
+                onNodeRotated: function onNodeRotated(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.hideOwnMenus();
+                    var previousRotationAngle = cn.options.rotate.rotationAngle;
+                    _underscore2.default.extend(cn.options, pkg.data);
+                    cn.rotate.set(pkg.data.rotate.rotationAngle - previousRotationAngle, 500);
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n rotating the node!');
+                },
+
+                onNodeColorChanged: function onNodeColorChanged(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.colorpicker.set(pkg.data);
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n changing the color!');
+                },
+
+                onNodeTextChanged: function onNodeTextChanged(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.editor.set(pkg.data.text, pkg.data.fontSize, pkg.data.fontColor);
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n changing the text!');
+                },
+
+                addRelationship: function addRelationship(pkg) {
+                    _self._.nodes.addRelationship(pkg.data);
+                    _self._.birdseye && _self._.birdseye.relationshipsChanged(pkg);
+                    addMessage(pkg, 'That was me\n adding the relationship!');
+                },
+
+                removeRelationship: function removeRelationship(pkg) {
+                    _self._.nodes.removeRelationship(pkg.data);
+                    _self._.birdseye && _self._.birdseye.relationshipsChanged(pkg);
+                    addMessage(pkg, 'That was me\n removing the relationship!');
+                },
+                //was replaced by onNodesMove, but I will leave this for now in case we want to animate a single node in future
+                onNodeMove: function onNodeMove(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.move(pkg);
+                    addMessage(pkg, 'That was me\n moving the node!');
+                },
+
+                onNodesMove: function onNodesMove(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    // cn.moveNodes(pkg);
+                    var animate = true;
+                    cn.slate.nodes.moveNodes(pkg, { animate: animate });
+                    cn.slate.birdseye && cn.slate.birdseye.nodeChanged(pkg);
+                    addMessage(pkg, 'That was me\n moving the node!');
+                },
+
+                changeLineColor: function changeLineColor(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.lineOptions.set(pkg.data);
+                    addMessage(pkg, 'That was me\n changing the line color!');
+                    _self._.birdseye && _self._.birdseye.nodeChanged(pkg);
+                },
+
+                changeLineWidth: function changeLineWidth(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.lineOptions.set(pkg.data);
+                    addMessage(pkg, 'That was me\n changing the line width!');
+                },
+
+                toggleParentArrow: function toggleParentArrow(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.lineOptions.set(pkg.data);
+                    addMessage(pkg, 'That was me\n adding the arrow!');
+                },
+
+                toggleChildArrow: function toggleChildArrow(pkg) {
+                    cn = _self._.nodes.one(pkg.data.id);
+                    cn.lineOptions.set(pkg.data);
+                    addMessage(pkg, 'That was me\n adding the arrow!');
+                },
+
+                onCanvasMove: function onCanvasMove(pkg) {
+                    var opts = {
+                        x: pkg.data.left,
+                        y: pkg.data.top,
+                        dur: pkg.data.duration || 500,
+                        callback: {
+                            after: function after() {
+                                _self._.birdseye && _self._.birdseye.refresh(true);
+                            }
+                        },
+                        isAbsolute: true
+                    };
+                    _self._.canvas.move(opts);
+                    addMessage(pkg, 'That was me\n moving the canvas!');
+                }
+                // ,
+                // onJSONChanged: function(pkg) {
+                //     _self._.loadJSON(pkg.json);
+                //     _self._.slate.birdseye && _self._.slate.birdseye.refresh(true);
+                //     addMessage(pkg, 'I just changed the slate!');
+                // }
+            };
+
+            pc.onCollaboration && pc.onCollaboration({ type: "init", slate: _self._, cb: function cb(pkg) {
+                    process(pkg);
+                } });
+            if (pc.localizedOnly) {
+                $s.localRecipients.push(_self);
+            }
+        }
+
+        _self.send = function (pkg) {
+            send(pkg);
+        };
+
+        function addMessage(pkg, msg) {
+            //CollaborationMessages.insert({userId: getUserId(), slateId: _self._._id || _self._.options.id, msg: msg});
+        };
+
+        function send(pkg) {
+            _self._.undoRedo && _self._.options.showUndoRedo && _self._.undoRedo.snap(); //pkg
+            if (pc.allow) {
+                if (_underscore2.default.isFunction(_self._.options.onSlateChanged)) {
+                    _self._.options.onSlateChanged.apply(this, [pkg]);
+                }
+                pc.onCollaboration && pc.onCollaboration({ type: "process", slate: _self._, pkg: pkg, cb: function cb(pkg) {
+                        process(pkg);
+                    } });
+            }
+        };
+
+        return _self;
+    };
+})(Slatebox, Slatebox.fn.slate);

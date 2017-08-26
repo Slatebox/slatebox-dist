@@ -1,0 +1,148 @@
+"use strict";
+
+var _underscore = require("underscore");
+
+var _underscore2 = _interopRequireDefault(_underscore);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+(function ($s, $n, $si) {
+    $n.fn._context = function () {
+        var _self = this,
+            _contextMenu,
+            _priorAllowDrag = true,
+            _height = 190;
+
+        //wire up event
+        var _wire = window.setInterval(function () {
+            if (_self._) {
+                _self.create();
+                window.clearInterval(_wire);
+            }
+        }, 500);
+
+        _self.create = function () {
+            if (_self._.text.node && _self._.options.allowContext && !_self._.slate.isAlt && !_self._.slate.isShift) {
+                _self._.text.node.oncontextmenu = _self._.vect.node.oncontextmenu = function (e) {
+                    _priorAllowDrag = _self._.options.allowDrag;
+                    _self._.options.allowDrag = false;
+                    _self.remove();
+                    buildContext(e);
+                    setTimeout(function (e) {
+                        _self._.options.allowDrag = _priorAllowDrag;
+                    }, 2);
+                    return $s.stopEvent(e);
+                };
+            }
+        };
+
+        function buildContext(e) {
+            _contextMenu = document.createElement('div');
+            _contextMenu.setAttribute("id", "contextMenu_" + _self._.options.id);
+            _contextMenu.setAttribute("class", "sb_cm");
+            document.body.appendChild(_contextMenu);
+            setContext(e);
+        };
+
+        function menuItems() {
+            var _tmp = "<div style='padding:5px;' class='sb_contextMenuItem' rel='{func}'>{text}</div>";
+            var _inside = _tmp.replace(/{func}/g, "tofront").replace(/{text}/g, "to front");
+            _inside += _tmp.replace(/{func}/g, "toback").replace(/{text}/g, "to back");
+            if (_priorAllowDrag) {
+                _inside += _tmp.replace(/{func}/g, "lock").replace(/{text}/g, "lock");
+            } else {
+                _inside += _tmp.replace(/{func}/g, "unlock").replace(/{text}/g, "unlock");
+            }
+            _inside += _tmp.replace(/{func}/g, "close").replace(/{text}/g, "close");
+            return _inside;
+        };
+
+        function setContext(e) {
+            _contextMenu.innerHTML = menuItems();
+
+            _underscore2.default.each($s.select("div.contextMenuItem"), function (elem) {
+                elem.onclick = function (e) {
+                    var act = this.getAttribute("rel"),
+                        _reorder = false;
+                    var pkg = { type: '', data: { id: _self._.options.id } };
+                    switch (act) {
+                        case "tofront":
+                            _self._.toFront();
+                            _reorder = true;
+                            pkg.type = 'onNodeToFront';
+                            break;
+                        case "toback":
+                            _self._.toBack();
+                            _reorder = true;
+                            pkg.type = 'onNodeToBack';
+                            break;
+                        case "lock":
+                            _self._.disable();
+                            pkg.type = 'onNodeLocked';
+                            break;
+                        case "unlock":
+                            _self._.enable();
+                            pkg.type = 'onNodeUnlocked';
+                            break;
+                        case "close":
+                            break;
+                    }
+                    if (_reorder) {
+                        var zIndex = 0;
+                        for (var node = _self._.slate.paper.bottom; node != null; node = node.next) {
+                            if (node.type === "ellipse" || node.type === "rect") {
+                                zIndex++;
+                                var _id = node.data("id");
+
+                                //not all rects have an id (the menu box is a rect, but it has no options.id because it is not a node
+                                //so you cannot always show this...
+                                if (_id) {
+                                    var reorderedNode = _underscore2.default.detect(_self._.slate.nodes.allNodes, function (n) {
+                                        return n.options.id === _id;
+                                    });
+                                    reorderedNode.sortorder = zIndex;
+                                }
+                            }
+                        }
+                        _self._.slate.nodes.allNodes.sort(function (a, b) {
+                            return a.sortorder < b.sortorder ? -1 : 1;
+                        });
+                    }
+                    if (pkg.type !== "") broadcast(pkg);
+                    _self.remove();
+                };
+            });
+
+            var mp = $s.mousePos(e);
+
+            var _x = mp.x; // _self._.options.xPos - _self._.slate.options.viewPort.left + _self._.options.width / 3;
+            var _y = mp.y; // _self._.options.yPos - _self._.slate.options.viewPort.top;
+            _contextMenu.style.left = _x + "px";
+            _contextMenu.style.top = _y + "px";
+            _contextMenu.style.height = _height + "px";
+        };
+
+        function broadcast(pkg) {
+            //broadcast
+            if (_self._.slate.collab) _self._.slate.collab.send(pkg);
+            if (_self._.slate.birdseye) _self._.slate.birdseye.nodeChanged(pkg);
+        };
+
+        _self.remove = function () {
+            _self._.slate.removeContextMenus();
+            _contextMenu = null;
+        };
+
+        _self.isVisible = function () {
+            return _contextMenu !== null;
+        };
+
+        return _self;
+    };
+    $si.fn.removeContextMenus = function () {
+        var _cm = $s.select("div.sb_cm");
+        _underscore2.default.each(_cm, function (elem) {
+            document.body.removeChild(elem);
+        });
+    };
+})(Slatebox, Slatebox.fn.node, Slatebox.fn.slate);
